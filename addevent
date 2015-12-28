@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+set -e
+
+abort() { echo "$@" 1>&2; exit 1; }
+
+USAGE="
+Usage: $0 [-xhn] [-c CAL_NUMBER] [-i INTERVAL] [-t DURATION] (-D DATETIME | -S SECONDS | -M MINUTES | -H HOURS | -d DAYS) TITLE
+-x) Debug (show all commands)
+-h) help
+-n) no alarm
+-D) date as YYYYmmdd or YYYYmmddHH or YYYYmmddHHMM
+-S) seconds later
+-M) minutes later
+-H) hours later
+-d) days later
+-c) calendar number
+-i) interval in minutes between the event and the alarm.
+    positive for alarm that trigger after the event date or negative for alarms that trigger before.
+-t) event duration in minutes
+
+Example:
+# add an event 3 hours later
+addevent -H 3 \"go outside to Ka'anapali Beach\"
+
+# 2 days later
+addevent -d 2 'Arima Onsen'
+
+# specific datetime
+addevent -D 20170707 'Grace Bay'
+
+# specify the calendar
+addevent -c 1 -M 30 \"Dag-walking\"
+"
+
+which osalang &> /dev/null || abort "osalang not found"
+which osascript &> /dev/null || abort "osascript not found"
+osalang | grep JavaScript &> /dev/null || abort "couldn't use Javascript. Must be OS X > 10.10"
+
+unset SET_ALARM
+unset DATETIME
+unset SECONDS
+unset MINUTES
+unset HOURS
+unset DAYS
+unset CAL_NUM
+unset INTERVAL
+unset DURATION
+
+while getopts xhnD:S:M:H:d:c:i:t: option; do
+  case $option in
+    x) set -x;;
+    n) SET_ALARM="false";;
+    D) DATETIME="$OPTARG";;
+    S) SECONDS="$OPTARG";;
+    M) MINUTES="$OPTARG";;
+    H) HOURS="$OPTARG";;
+    d) DAYS="$OPTARG";;
+    c) CAL_NUM="$OPTARG";;
+    i) INTERVAL="$OPTARG";;
+    t) DURATION="$OPTARG";;
+    h|\?) abort "$USAGE"
+  esac
+done
+shift `expr "$OPTIND" - 1`
+
+# cxheck if the arguments is enough
+[[ $# -gt 0 ]] || abort "$USAGE"
+TITLE="$1"
+
+# default values
+: ${SET_ALARM:="true"}
+: ${INTERVAL:=-1}
+: ${DATETIME:=`date +"%Y%m%d%H%M%S"`}
+
+# default duration is 30 minutes
+DEFAULT_DURATION=30
+
+# default duration to 24 hours if datetime is like 20160123
+[[ ${#DATETIME} -le 8 ]] && DEFAULT_DURATION=1439
+# padding 0
+while [[ ${#DATETIME} -lt 14 ]]; do DATETIME+="0"; done
+# force length to be 14
+DATETIME=`echo -n $DATETIME | cut -c -14`
+# validate datetime
+date -jf "%Y%m%d%H%M%S" "${DATETIME}" +"%s" &> /dev/null || abort "invalid datetime $DATETIME. make sure datetime is like 20160123, 2016012306, or 201601230645"
+
+# convert evenry time representation to seconds
+[[ $DAYS ]] && DATETIME="`date -j -v +${DAYS}d -f "%Y%m%d%H%M%S" "$DATETIME" +"%Y%m%d"`000000" && DEFAULT_DURATION=1439
+[[ $HOURS ]] && DATETIME="`date -j -v +${HOURS}H -f "%Y%m%d%H%M%S" "$DATETIME" +"%Y%m%d%H"`0000" && DEFAULT_DURATION=60
+[[ $MINUTES ]] && DATETIME="`date -j -v +${MINUTES}M -f "%Y%m%d%H%M%S" "$DATETIME" +"%Y%m%d%H%M"`00" && DEFAULT_DURATION=30
+[[ $SECONDS ]] && DATETIME="`date -j -v +${SECONDS}S -f "%Y%m%d%H%M%S" "$DATETIME" +"%Y%m%d%H%M%S"`" && DEFAULT_DURATION=3
+: ${DURATION:=$DEFAULT_DURATION}
+
+START_SECONDS=`date -jf "%Y%m%d%H%M%S" $DATETIME +"%s"`
+END_SECONDS=$((START_SECONDS+DURATION*60))
+
+# show prompt to specify the calendar to be used
+[[ $CAL_NUM ]] || {
+  echo '
+var app = Application("iCal");
+for (var i = 0; i < app.calendars.length; i++) console.log(i,app.calendars[i].name());
+' | osascript -l JavaScript
+  echo -n "which would you like to use? [Numeber] > " && read CAL_NUM
+  echo "
+###################################
+# You can specify the number of the calendar with '-c $CAL_NUM' next time.
+# Please see help with -h for the detail.
+###################################"
+}
+
+echo -n "
+the following will be added to the calendar
+
+title      : $TITLE
+startDate  : `date -jf "%s" $START_SECONDS`
+endDate    : `date -jf "%s" $END_SECONDS`
+calNumber  : $CAL_NUM
+setAlarm   : $SET_ALARM
+minToAlerm : $INTERVAL (`echo -n $INTERVAL | tr -d -` minutes `if [[ $INTERVAL -lt 0 ]]; then echo -n before; else echo -n after; fi` the startDate)
+
+are you sure? [Y/n] > " && read ans && [[ $ans == [Nn] ]] && abort "start over"
+
+# execute apple script
+echo "
+var title        = '$TITLE';
+var startSeconds = $START_SECONDS;
+var endSeconds   = $END_SECONDS;
+var calNumber    = $CAL_NUM
+var setAlarm     = $SET_ALARM
+var minToAlerm   = $INTERVAL
+
+var app       = Application('iCal');
+var startDate = new Date(startSeconds*1000);
+var endDate   = new Date(endSeconds*1000);
+var summary   = title;
+var cal       = app.calendars[calNumber];
+var event1    = app.Event({
+  startDate: startDate,
+  endDate  : endDate,
+  summary  : summary
+});
+cal.events.push(event1);
+if (setAlarm) event1.displayAlarms.push(app.DisplayAlarm({triggerInterval:minToAlerm}));
+'finished!'
+" | osascript -l JavaScript
+
