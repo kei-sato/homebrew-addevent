@@ -98,7 +98,8 @@ END_SECONDS=$((START_SECONDS+DURATION*60))
 # show prompt to specify the calendar to be used
 [[ $CAL_NUM ]] || {
   echo '
-var app = Application("iCal");
+var app = Application("Calendar");
+if (!app.running()) app.activate();
 for (var i = 0; i < app.calendars.length; i++) console.log(i,app.calendars[i].name());
 ' | osascript -l JavaScript
   echo -n "which would you like to use? [Numeber] > " && read CAL_NUM
@@ -130,7 +131,9 @@ var calNumber    = $CAL_NUM
 var setAlarm     = $SET_ALARM
 var minToAlerm   = $INTERVAL
 
-var app       = Application('iCal');
+var app = Application('Calendar');
+if (!app.running()) app.activate();
+
 var startDate = new Date(startSeconds*1000);
 var endDate   = new Date(endSeconds*1000);
 var summary   = title;
