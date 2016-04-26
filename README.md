@@ -8,6 +8,13 @@ brew tap kei-sato/addevent
 brew install addevent
 ```
 
+# upgrade
+
+```
+brew update
+brew upgrade addevent
+```
+
 ## Required environment
 must be OS X Yosemite 10.10, or later.
 
