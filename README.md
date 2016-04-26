@@ -18,10 +18,10 @@ must be OS X Yosemite 10.10, or later.
 addevent -H 3 "go outside to Ka'anapali Beach"
 
 # 2 days later
-addevent -d 2 "Arima Onsen"
+addevent -d 2 Arima Onsen
 
 # specific datetime
-addevent -D 20170707 "Grace Bay"
+addevent -D 20170707 Grace Bay
 ```
 
 # Usage
@@ -48,7 +48,7 @@ open Calendar > Preferences > Account
 ## select the calendar of the google account
 
 ```
-$ addevent -d 1 "an event"
+$ addevent -d 1 an event
 0 xxxxxxxxxxx
 1 youraccount@gmail.com
 2 xxxxxxxxxxx
