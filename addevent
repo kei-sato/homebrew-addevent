@@ -102,7 +102,7 @@ var app = Application("Calendar");
 if (!app.running()) app.activate();
 for (var i = 0; i < app.calendars.length; i++) console.log(i,app.calendars[i].name());
 ' | osascript -l JavaScript
-  echo -n "which would you like to use? [Numeber] > " && read CAL_NUM
+  echo -n "which would you like to use? [Numeber] > " && read -r CAL_NUM
   echo "
 ###################################
 # You can specify the number of the calendar with '-c $CAL_NUM' next time.
@@ -120,7 +120,7 @@ calNumber  : $CAL_NUM
 setAlarm   : $SET_ALARM
 minToAlerm : $INTERVAL (`echo -n $INTERVAL | tr -d -` minutes `if [[ $INTERVAL -lt 0 ]]; then echo -n before; else echo -n after; fi` the startDate)
 
-are you sure? [Y/n] > " && read ans && [[ $ans == [Nn] ]] && abort "start over"
+are you sure? [Y/n] > " && read -r ans && [[ $ans == [Nn] ]] && abort "start over"
 
 # execute apple script
 echo "
